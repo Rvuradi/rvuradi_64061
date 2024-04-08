@@ -1,0 +1,176 @@
+---
+title: "Assignment 3: Time-Series Data"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(lubridate)
+library(quantmod)
+library(keras)
+library(ggplot2)
+```
+
+# Step 1: Data Loading and Inspection
+
+```{r}
+# Load the dataset
+msft_data <- read_csv("Microsoft_Stock.csv")
+```
+
+```{r}
+# Display the first few rows of the dataset
+head(msft_data)
+```
+
+```{r}
+# Display the structure of the dataset
+str(msft_data)
+```
+
+# Step 2: Exploratory Data Analysis (EDA)
+
+```{r}
+# Plotting histogram of stock prices
+ggplot(msft_data, aes(x = Close)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+  labs(title = "Histogram of Microsoft Stock Prices", x = "Close Price", y = "Frequency")
+```
+
+# Step 3: Data Preprocessing
+
+```{r}
+# Convert Date column to Date type
+msft_data$Date <- as.Date(msft_data$Date)
+```
+
+```{r}
+# Normalize the data
+train_min <- min(msft_data$Close)
+train_max <- max(msft_data$Close)
+msft_data$Close <- scale(msft_data$Close, center = train_min, scale = train_max - train_min)
+```
+
+```{r}
+# Split the dataset into training, validation, and test sets
+train_len <- as.integer(nrow(msft_data) * 0.7)
+val_len <- as.integer(nrow(msft_data) * 0.15)
+
+train_data <- msft_data[1:train_len, ]
+val_data <- msft_data[(train_len + 1):(train_len + val_len), ]
+test_data <- msft_data[(train_len + val_len + 1):nrow(msft_data), ]
+```
+
+
+# Step 4: Model Building
+
+```{r}
+library(tensorflow)
+library(keras)
+# Define the RNN architecture
+suppressWarnings(model <- keras_model_sequential() %>%
+  layer_lstm(units = 50, input_shape = c(1, 1)) %>%
+  layer_dense(units = 1))
+```
+
+```{r}
+# Compile the model
+model %>% compile(
+  loss = "mse",
+  optimizer = optimizer_adam(),
+  metrics = c("mae")
+)
+```
+
+# Step 5: Training and Validation
+
+```{r}
+# Prepare data for input to the model
+X_train <- array_reshape(train_data$Close, c(length(train_data$Close), 1, 1))
+X_val <- array_reshape(val_data$Close, c(length(val_data$Close), 1, 1))
+```
+
+```{r}
+# Fit the model
+history <- model %>% fit(
+  x = X_train, y = train_data$Close,
+  epochs = 50, batch_size = 32,
+  validation_data = list(X_val, val_data$Close),
+  verbose = 2
+)
+```
+
+# Step 6: Evaluation
+
+```{r}
+# Prepare test data for evaluation
+X_test <- array_reshape(test_data$Close, c(length(test_data$Close), 1, 1))
+```
+
+```{r}
+# Predict on test data
+predictions <- model %>% predict(X_test)
+```
+
+```{r}
+# Calculate test MAE
+test_mae <- mean(abs(predictions - test_data$Close))
+```
+
+```{r}
+# Print the test MAE
+print(paste("Test MAE:", test_mae))
+```
+
+# Step 7: Visualizations
+
+```{r}
+# Plot training and validation loss over epochs
+plot(history) 
+```
+
+```{r}
+# Visualize actual vs. predicted prices on test data
+test_data <- test_data %>%
+  mutate(Predicted_Close = as.vector(predictions))
+
+ggplot(test_data, aes(Date)) +
+  geom_line(aes(y = Close, color = "Actual")) +
+  geom_line(aes(y = Predicted_Close, color = "Predicted")) +
+  labs(title = "Actual vs. Predicted Stock Prices on Test Data", x = "Date", y = "Close Price") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red"))
+```
+
+```{r}
+# Plot performance metric (MAE) on test data
+performance <- data.frame(Method = "RNN", MAE = test_mae)
+ggplot(performance, aes(Method, MAE)) +
+  geom_bar(stat = "identity", fill = "skyblue", width = 0.5) +
+  labs(title = "Model Performance on Test Data", x = "Model", y = "Mean Absolute Error")
+```
+
+```{r}
+# Create a dataframe combining actual and predicted prices
+scatter_data <- data.frame(
+  Date = test_data$Date,
+  Actual_Close = test_data$Close,
+  Predicted_Close = as.vector(predictions)
+)
+
+# Scatter plot of actual vs. predicted prices
+ggplot(scatter_data, aes(x = Actual_Close, y = Predicted_Close)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs. Predicted Stock Prices (Test Data)",
+       x = "Actual Close Price",
+       y = "Predicted Close Price") +
+  theme_minimal()
+```
