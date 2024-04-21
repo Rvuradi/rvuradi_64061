@@ -1,0 +1,110 @@
+---
+title: "AML Rohit Assignment-4"
+author: "ROHIT VURADI"
+date: "2024-04-21"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Introduction
+This demonstrates how to perform sentiment analysis on the IMDB movie review dataset using Recurrent Neural Networks (RNNs) with the Keras library in R. We'll modify the example from Chapter 6 of the book to align with the specific requirements of our assignment.
+
+RNNs and Transformers are the commonly used models in the field of NLP ( Natural Language Processing). They are used for processing sequential data such as text to derive meaning/understanding. ElseGRUs, including Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU), are very capable of keeping a memory over time since they preserve the memory by sequencing. And different, to transformentation which apply attention self-mechanisms to the model work, there is a capturing of long-range aspects in sequences. RNNs and transformers can be used when it comes to text and data in sequences both for tasks such as sentiment analysis, machine translation, and text generation.
+
+**To apply RNNs or Transformers to text data:To apply RNNs or Transformers to text data:**
+
+Preprocess the text data: Let’s take the text and break it down into words or subwords, convert those tokens into numerical form (such as word embeddings) , and finally ensure the sequences of the sequence length are equal.
+
+Define the model architecture: Construct a neural network model, which is going to have suitable layers for processing sequential data. For RNNs this is where it embeds the words in different ways and then these are concatenated (LSTM, GRU). To the Transformers, forming a complementary relation between the self-attention layers and the feedforward layers would be desirable.
+
+Compile and train the model: Collect the model with the proper loss function and optimizer, then provide the training data for the model successively.
+
+Evaluate the model: Evaluate the model on the validation or test set, which is different from the training set and contains the information about how well the model performs at text data processing.
+
+
+```{r}
+# load the neccessary library
+library(keras)
+```
+
+## Loading the IMDB Dataset
+We'll load the IMDB dataset with the following modifications:
+
+Cutoff reviews after 150 words.
+Restrict training samples to 100.
+Validation on 10,000 samples.
+Consider only the top 10,000 words.
+
+```{r}
+# load the IMDB dataset
+imdb <- dataset_imdb(num_words = 10000)
+maxlen <- 150
+x_train <- pad_sequences(imdb$train$x, maxlen = maxlen)
+x_test <- pad_sequences(imdb$test$x, maxlen = maxlen)
+sample_size <- 100
+x_train <- x_train[1:sample_size, ]
+y_train <- as.matrix(imdb$train$y)[1:sample_size, ]
+x_val <- x_test[1:10000, ]
+y_val <- as.matrix(imdb$test$y)[1:10000, ]
+```
+
+```{r}
+# check the dimensions of the training and validation sets
+dim(x_train)
+dim(y_train)
+dim(x_val)
+dim(y_val)
+```
+
+```{r}
+# check the first 5 elements of the training set
+head(x_train)
+```
+
+```{r}
+# plot the distribution
+hist(y_train, breaks = 2)
+```
+
+## Model Definition and Compilation
+We define an RNN model with an embedding layer and LSTM layer:
+
+```{r}
+model <- keras_model_sequential() %>%
+  layer_embedding(input_dim = 10000, output_dim = 128) %>%
+  layer_lstm(units = 64) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = "adam",
+  metrics = c("accuracy")
+)
+```
+
+## Model Training
+We train the model for 20 epochs with a batch size of 100 samples.
+
+```{r}
+model %>% fit(
+  x_train, y_train,
+  epochs = 20,
+  batch_size = 100,
+  validation_data = list(x_val, y_val)
+)
+```
+
+## Model Evaluation
+We evaluate the model on the test set:  
+
+```{r}
+loss_and_metrics <- model %>% evaluate(x_test, imdb$test$y, batch_size = 32)
+cat("Test Loss:", loss_and_metrics[[1]], "\n")
+cat("Test Accuracy:", loss_and_metrics[[2]], "\n")
+```
+
+
+
+## Conclusion
+We have successfully trained and evaluated an RNN model for sentiment analysis on the IMDB dataset with the specified modifications. Further experiments can be conducted to explore the impact of using pre-trained word embeddings and varying the number of training samples on model performance.
