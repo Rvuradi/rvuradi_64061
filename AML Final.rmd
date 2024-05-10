@@ -1,0 +1,171 @@
+---
+title: "Final Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(keras)
+library(tensorflow)
+library(tidyverse)
+```
+
+```{r}
+# Load IMDb movie reviews dataset
+imdb <- dataset_imdb(num_words = 10000)
+```
+
+```{r}
+# Display dataset structure
+str(imdb)
+```
+
+```{r}
+# Split the dataset into training and testing sets
+x_train <- imdb$train$x
+y_train <- imdb$train$y
+x_test <- imdb$test$x
+y_test <- imdb$test$y
+```
+
+```{r}
+# Pad sequences to ensure uniform length
+maxlen <- 100
+x_train <- pad_sequences(x_train, maxlen = maxlen)
+x_test <- pad_sequences(x_test, maxlen = maxlen)
+```
+
+```{r}
+# Build the model
+model <- keras_model_sequential() %>%
+  layer_embedding(input_dim = 10000, output_dim = 128, input_length = maxlen) %>%
+  layer_flatten() %>%
+  layer_dense(units = 1, activation = "sigmoid")
+```
+
+```{r}
+# Compile the model
+model %>% compile(
+  optimizer = "adam",
+  loss = "binary_crossentropy",
+  metrics = c("accuracy")
+)
+```
+
+```{r}
+# Train the model
+history <- model %>% fit(
+  x_train, y_train,
+  epochs = 10,
+  batch_size = 32,
+  validation_split = 0.2
+)
+```
+
+```{r}
+# Evaluate the model on the test set
+results <- model %>% evaluate(x_test, y_test)  
+```
+
+This evaluates the model on the test set and stores the results in the "results" object. The model's evaluate method calculates the loss and accuracy of the model on the test set based on the input data and labels. The results object contains the evaluation metrics, which can be used to assess the model's performance on unseen data.
+
+
+```{r}
+# Print out evaluation results
+print(results)
+```
+
+```{r}
+# Plot training and validation accuracy and loss
+plot(history)
+```
+
+This plots the training and validation accuracy and loss based on the model training history. The accuracy and loss values are plotted for each epoch. The training accuracy and loss are shown in blue, while the validation accuracy and loss are shown in orange. The plot provides a visual representation of how the model performed during training and whether there were any issues such as overfitting or underfitting.
+
+```{r}
+# calculate predictions on test data
+predictions <- model %>% predict(x_test)
+# convert predictions to binary class labels
+predictions <- ifelse(predictions > 0.5, 1, 0)
+# calculate accuracy of predictions vs actual labels
+accuracy <- mean(predictions == y_test)
+print(accuracy)
+```
+
+```{r}
+# confusion matrix
+cm <- table(predictions, y_test)
+print(cm)
+```
+
+This prints out the confusion matrix comparing the model predictions on the test set to the actual labels in the test set. The confusion matrix allows evaluation of the model's performance in terms of true positives, true negatives, false positives, and false negatives. This information can be used to assess the model's accuracy, precision, recall, and F1 score.
+
+```{r}
+# Table of confusion matrix
+library(gmodels)
+CrossTable(x = predictions, y = y_test, prop.chisq = FALSE, prop.t = FALSE, dnn = c('predicted', 'actual'))
+
+```
+
+```{r}
+# calulate precision, recall, and F1 score from confusion matrix
+precison <- cm[1,1]/(cm[1,1]+cm[1,2])
+recall <- cm[1,1]/(cm[1,1]+cm[2,1])
+f1 <- 2*(precison*recall)/(precison+recall)
+print(c(precision = precison, recall = recall, f1 = f1))
+```
+
+```{r}
+library(pROC)
+# ROC curve with specific labels
+roc_obj <- roc(response = y_test, predictor = predictions)
+plot(roc_obj, print.auc = TRUE, legacy.axes = TRUE, grid = TRUE, grid.col = "gray")
+```
+
+This plots the ROC curve based on the roc object calculated above. The ROC curve is a graphical representation of the true positive rate (sensitivity) against the false positive rate (1-specificity) for different threshold values. The area under the ROC curve (AUC) provides a measure of the model's performance, with a higher AUC indicating better performance.
+
+The ROC curve allows evaluation of the model's ability to correctly classify positive and negative instances across different threshold values. The AUC provides a single value that summarizes the overall performance of the model, with a higher AUC indicating better performance.
+
+```{r}
+# Calculate AUC from ROC curve
+auc <- roc_obj$auc
+print(auc)
+```
+This prints out the calculated AUC value from the ROC curve object to see the numeric performance measurement of the model based on the area under the ROC curve. The AUC value provides a single metric that summarizes the model's performance in terms of its ability to correctly classify positive and negative instances across different threshold values. A higher AUC value indicates better performance, with a value of 0.5 indicating random performance and a value of 1 indicating perfect performance.
+
+```{r}
+# plot the data distribution
+par(mfrow = c(1,2))
+hist(x_train, main = "Training data distribution", xlab = "Value")
+hist(x_test, main = "Test data distribution", xlab = "Value")
+```
+
+This plots the distribution of the test data alongside the training data distribution for comparison. By plotting both distributions, we can check whether the test data has a similar distribution to the training data. Significant differences in the distributions could indicate a potential problem and suggest the need for further data preprocessing or model adjustments. Comparing the distributions helps validate that the test set is representative of the training data distribution.
+
+```{r}
+# plot the correaltion matrix
+cor_mat <- cor(x_train)
+image(cor_mat, col = cm.colors(256))
+```
+
+```{r}
+# plot the correaltion matrix with labels
+library(corrplot)
+corr_mat <- cor(x_train)
+corrplot(corr_mat, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+```
+
+This plots the correlation matrix with labels by using the corrplot package. The correlation matrix provides information about the relationships between variables in the dataset. By visualizing the correlation matrix, we can identify patterns and relationships between variables, which can help in feature selection, data preprocessing, and model building. The correlation matrix plot helps to identify potential multicollinearity issues and understand the relationships between variables in the dataset.
+
+
+
+
+
+
+
+
+
+
